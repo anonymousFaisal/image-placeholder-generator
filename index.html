@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Transparent PNG Placeholder Generator</title>
+  <style>
+    :root{
+      --bg:#0b0c10; /* app background */
+      --card:#111318;
+      --muted:#9aa3af;
+      --accent:#7c3aed;
+      --accent-2:#22c55e;
+      --error:#ef4444;
+      --ring: #3b82f6;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif;
+      background:linear-gradient(180deg, #0b0c10 0%, #0e1117 100%);
+      color:#e5e7eb;
+      -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+    }
+    a{color:inherit}
+    .container{max-width:1200px;margin:0 auto;padding:24px}
+    header{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:16px}
+    .title{font-weight:700;font-size:clamp(18px,2.2vw,24px)}
+    .sub{color:var(--muted);font-size:14px}
+    .grid{display:grid;grid-template-columns:1fr;gap:16px}
+    @media(min-width:980px){.grid{grid-template-columns:420px 1fr}}
+
+    .card{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);
+      border-radius:16px; padding:16px; backdrop-filter: blur(6px)}
+
+    .fieldset{display:grid;gap:12px}
+    .row{display:grid;grid-template-columns:1fr 1fr; gap:10px}
+    .control{display:flex;flex-direction:column;gap:6px}
+    label{font-size:12px;color:#cbd5e1}
+    input[type="number"], select, input[type="text"]{
+      background:#0f1218;border:1px solid #1f2937;color:#e5e7eb;border-radius:10px; padding:10px 12px; outline:none;
+    }
+    input[type="number"]:focus, select:focus, input[type="text"]:focus{border-color:var(--ring); box-shadow:0 0 0 3px rgba(59,130,246,.25)}
+    .hint{font-size:12px;color:var(--muted)}
+    .error{color:var(--error);font-size:12px}
+
+    .presets{display:flex;flex-wrap:wrap;gap:8px}
+    .chip{border:1px solid #273041;background:#121621;color:#e5e7eb;border-radius:999px;padding:6px 10px;font-size:12px;cursor:pointer}
+    .chip[aria-pressed="true"], .chip.active{background:var(--accent);border-color:transparent}
+    .chip:focus{outline:2px solid var(--ring);outline-offset:2px}
+
+    .preview-wrap{display:flex;flex-direction:column; gap:12px}
+    .preview-area{position:relative;border-radius:14px;border:1px dashed #334155;background:#0b0e13;min-height:300px;display:flex;align-items:center;justify-content:center;padding:14px}
+
+    /* checkerboard */
+    .checker{
+      --s:14px; /* square size */
+      background:
+       conic-gradient(#0000 90deg,#111827 0 180deg,#0000 0) 0 calc(var(--s)/2)/var(--s) var(--s),
+       conic-gradient(#374151 90deg,#1f2937 0 180deg,#374151 0) 0 0/var(--s) var(--s);
+      position:relative; border:1px solid #475569; border-radius:10px;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04), 0 8px 28px rgba(0,0,0,0.45);
+    }
+
+    .canvas-box{position:relative; display:block}
+    .canvas-label{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+      pointer-events:none; text-align:center; padding:8px; font-weight:600; color:#e5e7eb; text-shadow:0 1px 2px rgba(0,0,0,.45)}
+
+    .toolbar{display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:flex-start}
+    button.primary{background:var(--accent); color:white; border:none; border-radius:12px; padding:10px 14px; font-weight:700; cursor:pointer}
+    button.secondary{background:#121621; color:#e5e7eb; border:1px solid #293346; border-radius:12px; padding:10px 14px; font-weight:600; cursor:pointer}
+    button.primary:focus, button.secondary:focus{outline:2px solid var(--ring); outline-offset:2px}
+
+    .switch{display:flex; align-items:center; gap:8px}
+    .switch input{appearance:none; width:44px; height:24px; background:#1f2937; border-radius:999px; position:relative; outline:none; cursor:pointer; border:1px solid #334155}
+    .switch input:checked{background:var(--accent)}
+    .switch input::after{content:""; position:absolute; width:18px; height:18px; background:white; border-radius:999px; top:2px; left:2px; transition:transform .2s ease}
+    .switch input:checked::after{transform:translateX(20px)}
+
+    .colors{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+    input[type="color"]{width:42px; height:34px; border:1px solid #273041; background:#0f1218; border-radius:8px; padding:0}
+
+    .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+    .small{font-size:12px;color:#9ca3af}
+
+    .footer{margin-top:10px;color:#94a3b8;font-size:12px}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <div class="title">PNG Placeholder Generator</div>
+        <div class="sub">Create transparent or colored PNGs at exact dimensions & ratios. Accessible, offline, no tracking.</div>
+      </div>
+      <a class="small" href="#" id="resetLink" title="Reset">Reset</a>
+    </header>
+
+    <div class="grid">
+      <!-- Controls -->
+      <section class="card" aria-labelledby="controls-heading">
+        <h2 id="controls-heading" class="sr-only">Controls</h2>
+        <div class="fieldset">
+          <div class="row">
+            <div class="control">
+              <label for="width">Width (px)</label>
+              <input type="number" id="width" inputmode="numeric" min="1" max="10000" step="1" value="1920" aria-describedby="dim-help" />
+            </div>
+            <div class="control">
+              <label for="height">Height (px)</label>
+              <input type="number" id="height" inputmode="numeric" min="1" max="10000" step="1" value="1080" />
+            </div>
+          </div>
+
+          <div class="control">
+            <label for="ratioSelect">Aspect Ratio Presets</label>
+            <div class="presets" role="group" aria-label="Aspect ratio presets">
+              <button class="chip" data-ratio="16:9" aria-pressed="false">16:9</button>
+              <button class="chip" data-ratio="4:3" aria-pressed="false">4:3</button>
+              <button class="chip" data-ratio="1:1" aria-pressed="false">1:1</button>
+              <button class="chip" data-ratio="3:2" aria-pressed="false">3:2</button>
+              <button class="chip" data-ratio="9:16" aria-pressed="false">9:16</button>
+              <button class="chip" data-ratio="4:5" aria-pressed="false">4:5</button>
+            </div>
+            <div class="hint" id="dim-help">Tip: choose a preset, then change width to auto-calc height. Toggle lock to keep ratio.</div>
+          </div>
+
+          <div class="row">
+            <div class="control">
+              <label class="switch" for="lockRatio">
+                <input type="checkbox" id="lockRatio" checked />
+                <span>Lock aspect ratio</span>
+              </label>
+              <div class="small" id="ratioReadout" aria-live="polite">Current ratio: 16:9</div>
+            </div>
+            <div class="control">
+              <label class="switch" for="transparentBg">
+                <input type="checkbox" id="transparentBg" checked />
+                <span>Transparent background</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="colors" id="colorRow" aria-hidden="true">
+            <div class="control" style="min-width:180px">
+              <label for="bgColor">Placeholder color</label>
+              <input type="color" id="bgColor" value="#6b7280" title="Placeholder color" />
+            </div>
+            <div class="control" style="min-width:180px">
+              <label for="textColor">Label color</label>
+              <input type="color" id="textColor" value="#ffffff" title="Label color" />
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="control">
+              <label class="switch" for="showLabel">
+                <input type="checkbox" id="showLabel" checked />
+                <span>Show center label</span>
+              </label>
+              <div class="small">Will display e.g. "1920×1080" centered.</div>
+            </div>
+            <div class="control">
+              <label for="customLabel">Custom label (optional)</label>
+              <input type="text" id="customLabel" placeholder="Leave empty to use WxH" />
+            </div>
+          </div>
+
+          <div class="toolbar">
+            <button class="secondary" id="updateBtn" type="button" aria-label="Update preview">Update Preview</button>
+            <button class="primary" id="downloadBtn" type="button" aria-label="Download PNG">Download PNG</button>
+            <span class="small" id="fileNamePreview" aria-live="polite"></span>
+          </div>
+
+          <div class="error" id="errorMsg" role="alert" aria-live="assertive" style="display:none"></div>
+        </div>
+      </section>
+
+      <!-- Preview -->
+      <section class="card preview-wrap" aria-labelledby="preview-heading">
+        <h2 id="preview-heading" class="sr-only">Preview</h2>
+        <div class="preview-area" id="previewArea">
+          <div id="previewCanvas" class="checker canvas-box" aria-label="Canvas preview" role="img" title="Canvas preview"></div>
+          <div id="previewOverlay" class="canvas-label" aria-hidden="true"></div>
+        </div>
+        <div class="small">Preview is scaled to fit. Actual PNG will be generated at exact pixel size.</div>
+      </section>
+    </div>
+
+    <div class="footer">Keyboard tips: Tab through controls, Space/Enter to toggle chips & switches. Everything runs locally in your browser.</div>
+  </div>
+
+  <canvas id="worker" class="sr-only" aria-hidden="true"></canvas>
+
+  <script>
+    const el = id => document.getElementById(id);
+
+    const widthInput = el('width');
+    const heightInput = el('height');
+    const lockRatio = el('lockRatio');
+    const transparentBg = el('transparentBg');
+    const bgColor = el('bgColor');
+    const textColor = el('textColor');
+    const colorRow = el('colorRow');
+
+    const showLabel = el('showLabel');
+    const customLabel = el('customLabel');
+
+    const previewArea = el('previewArea');
+    const previewCanvas = el('previewCanvas');
+    const previewOverlay = el('previewOverlay');
+
+    const updateBtn = el('updateBtn');
+    const downloadBtn = el('downloadBtn');
+    const ratioReadout = el('ratioReadout');
+    const fileNamePreview = el('fileNamePreview');
+    const errorMsg = el('errorMsg');
+    const resetLink = el('resetLink');
+
+    const chips = Array.from(document.querySelectorAll('.chip'));
+
+    let presetRatio = [16,9];
+
+    function gcd(a,b){return b?gcd(b,a%b):a}
+    function formatRatio(w,h){
+      const g = gcd(w,h); return `${w/g}:${h/g}`;
+    }
+
+    function setPreset(ratioStr){
+      const [w,h] = ratioStr.split(':').map(Number);
+      if(!w||!h) return;
+      presetRatio = [w,h];
+      chips.forEach(c=>{const active = c.dataset.ratio===ratioStr; c.setAttribute('aria-pressed', active); c.classList.toggle('active', active)});
+      ratioReadout.textContent = `Current ratio: ${w}:${h}`;
+      if(lockRatio.checked){
+        // Recalculate height from current width
+        const width = clampInt(widthInput.value,1,10000) || 1;
+        const newH = Math.max(1, Math.round(width * (h / w)));
+        heightInput.value = newH;
+      }
+      update();
+    }
+
+    function clampInt(val, min, max){
+      const n = parseInt(val,10); if(isNaN(n)) return NaN; return Math.min(Math.max(n, min), max);
+    }
+
+    function validate(){
+      const w = clampInt(widthInput.value, 1, 10000);
+      const h = clampInt(heightInput.value, 1, 10000);
+      let msg = '';
+      if(isNaN(w) || isNaN(h)) msg = 'Enter integers between 1 and 10000.';
+      else if(w<1||h<1) msg = 'Width and height must be at least 1px.';
+      else if(w>10000||h>10000) msg = 'Maximum supported dimension is 10000px.';
+
+      errorMsg.style.display = msg? 'block':'none';
+      errorMsg.textContent = msg;
+      return !msg;
+    }
+
+    function updateRatioFromInputs(){
+      const w = clampInt(widthInput.value,1,10000);
+      const h = clampInt(heightInput.value,1,10000);
+      if(!isNaN(w) && !isNaN(h)){
+        ratioReadout.textContent = `Current ratio: ${formatRatio(w,h)}`;
+      }
+    }
+
+    function maybeSyncHeightFromWidth(){
+      if(!lockRatio.checked) return;
+      const w = clampInt(widthInput.value,1,10000);
+      const [rw,rh] = presetRatio;
+      if(!isNaN(w)){
+        heightInput.value = Math.max(1, Math.round(w * rh / rw));
+      }
+    }
+
+    function updateFileName(){
+      const w = clampInt(widthInput.value,1,10000);
+      const h = clampInt(heightInput.value,1,10000);
+      if(isNaN(w)||isNaN(h)) {fileNamePreview.textContent = ''; return}
+      const prefix = transparentBg.checked ? 'transparent' : 'placeholder';
+      fileNamePreview.textContent = `${prefix}_${w}x${h}.png`;
+    }
+
+    function updatePreview(){
+      const ok = validate();
+      if(!ok) return;
+      const w = clampInt(widthInput.value,1,10000);
+      const h = clampInt(heightInput.value,1,10000);
+
+      // scale box to fit preview area
+      const pad = 24;
+      const availW = previewArea.clientWidth - pad*2;
+      const availH = previewArea.clientHeight - pad*2;
+      const scale = Math.min(availW / w, availH / h);
+      const boxW = Math.max(1, Math.round(w * scale));
+      const boxH = Math.max(1, Math.round(h * scale));
+      previewCanvas.style.width = boxW + 'px';
+      previewCanvas.style.height = boxH + 'px';
+
+      // color overlay for non-transparent
+      if(transparentBg.checked){
+        previewCanvas.style.backgroundColor = '';
+      } else {
+        previewCanvas.style.background = bgColor.value;
+      }
+
+      const labelOn = showLabel.checked;
+      const labelText = (customLabel.value || `${w}×${h}`);
+      previewOverlay.style.display = labelOn ? 'flex' : 'none';
+      previewOverlay.textContent = labelOn ? labelText : '';
+      previewOverlay.style.color = textColor.value;
+      previewOverlay.style.fontSize = Math.max(12, Math.min(48, Math.round(Math.min(boxW, boxH) * 0.12))) + 'px';
+
+      updateFileName();
+    }
+
+    function update(){
+      updateRatioFromInputs();
+      updatePreview();
+    }
+
+    function generateAndDownload(){
+      if(!validate()) return;
+      const w = clampInt(widthInput.value,1,10000);
+      const h = clampInt(heightInput.value,1,10000);
+
+      const cnv = document.createElement('canvas');
+      // Respect devicePixelRatio for crisper text if any
+      const dpr = 1; // keep exact px output; change to window.devicePixelRatio for hi-dpi label if desired
+      cnv.width = Math.round(w * dpr);
+      cnv.height = Math.round(h * dpr);
+      const ctx = cnv.getContext('2d');
+
+      if(!transparentBg.checked){
+        ctx.fillStyle = bgColor.value;
+        ctx.fillRect(0,0,cnv.width,cnv.height);
+      } else {
+        // Ensure full transparency
+        ctx.clearRect(0,0,cnv.width,cnv.height);
+      }
+
+      if(showLabel.checked){
+        const labelText = (customLabel.value || `${w}×${h}`);
+        const minSide = Math.min(cnv.width, cnv.height);
+        let fontSize = Math.max(16, Math.floor(minSide * 0.12));
+        ctx.font = `700 ${fontSize}px system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = textColor.value;
+        // Optional subtle shadow for contrast on colored bg or checkerboard
+        ctx.shadowColor = 'rgba(0,0,0,0.45)';
+        ctx.shadowBlur = Math.floor(fontSize/8);
+        ctx.shadowOffsetY = Math.floor(fontSize/16);
+        ctx.fillText(labelText, cnv.width/2, cnv.height/2);
+        ctx.shadowColor = 'transparent';
+      }
+
+      cnv.toBlob(blob => {
+        const prefix = transparentBg.checked ? 'transparent' : 'placeholder';
+        const name = `${prefix}_${w}x${h}.png`;
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
+      }, 'image/png');
+    }
+
+    // Events
+    chips.forEach(chip=>{
+      chip.addEventListener('click', ()=> setPreset(chip.dataset.ratio));
+      chip.addEventListener('keydown', (e)=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); setPreset(chip.dataset.ratio);} });
+    });
+
+    widthInput.addEventListener('input', ()=>{ maybeSyncHeightFromWidth(); update(); });
+    heightInput.addEventListener('input', ()=>{ update(); });
+    lockRatio.addEventListener('change', ()=>{ if(lockRatio.checked) maybeSyncHeightFromWidth(); update(); });
+
+    transparentBg.addEventListener('change', ()=>{
+      const hidden = transparentBg.checked;
+      colorRow.setAttribute('aria-hidden', hidden);
+      colorRow.style.display = hidden ? 'none':'flex';
+      update();
+    });
+
+    bgColor.addEventListener('input', update);
+    textColor.addEventListener('input', update);
+    showLabel.addEventListener('change', update);
+    customLabel.addEventListener('input', update);
+
+    updateBtn.addEventListener('click', update);
+    downloadBtn.addEventListener('click', generateAndDownload);
+
+    resetLink.addEventListener('click', (e)=>{
+      e.preventDefault();
+      widthInput.value = 1920; heightInput.value = 1080;
+      setPreset('16:9');
+      lockRatio.checked = true;
+      transparentBg.checked = true; 
+      colorRow.style.display = 'none';
+      showLabel.checked = true; customLabel.value = '';
+      bgColor.value = '#6b7280'; textColor.value = '#ffffff';
+      update();
+    });
+
+    // init
+    setPreset('16:9');
+    update();
+    window.addEventListener('resize', ()=>{ // keep preview sensible
+      updatePreview();
+    });
+  </script>
+</body>
+</html>
